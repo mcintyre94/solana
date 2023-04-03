@@ -13,6 +13,9 @@
 //! As the messages are encrypted as scalar elements (a.k.a. in the "exponent"), one must solve the
 //! discrete log to recover the originally encrypted value.
 
+use js_sys::Uint8Array;
+use wasm_bindgen::{convert::IntoWasmAbi, describe::WasmDescribe};
+
 use {
     crate::encryption::{
         discrete_log::DiscreteLog,
@@ -34,6 +37,7 @@ use {
     },
     std::convert::TryInto,
     subtle::{Choice, ConstantTimeEq},
+    wasm_bindgen::prelude::*,
     zeroize::Zeroize,
 };
 #[cfg(not(target_os = "solana"))]
@@ -258,17 +262,10 @@ impl ElGamalKeypair {
 
 /// Public key for the ElGamal encryption scheme.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize, Zeroize)]
+#[wasm_bindgen]
 pub struct ElGamalPubkey(RistrettoPoint);
+
 impl ElGamalPubkey {
-    /// Derives the `ElGamalPubkey` that uniquely corresponds to an `ElGamalSecretKey`.
-    #[allow(non_snake_case)]
-    pub fn new(secret: &ElGamalSecretKey) -> Self {
-        let s = &secret.0;
-        assert!(s != &Scalar::zero());
-
-        ElGamalPubkey(s.invert() * &(*H))
-    }
-
     pub fn get_point(&self) -> &RistrettoPoint {
         &self.0
     }
@@ -311,6 +308,32 @@ impl ElGamalPubkey {
     }
 }
 
+#[wasm_bindgen]
+impl ElGamalPubkey {
+    /// Derives the `ElGamalPubkey` that uniquely corresponds to an `ElGamalSecretKey`.
+    #[allow(non_snake_case)]
+    pub fn new(secret: &ElGamalSecretKey) -> Self {
+        let s = &secret.0;
+        assert!(s != &Scalar::zero());
+
+        ElGamalPubkey(s.invert() * &(*H))
+    }
+
+    pub fn to_uint8_array(&self) -> Uint8Array {
+        Uint8Array::from(self.0.compress().to_bytes().as_slice())
+    }
+
+    // pub fn from_uint8_array() from_bytes(bytes: &[u8]) -> Option<ElGamalPubkey> {
+    //     if bytes.len() != 32 {
+    //         return None;
+    //     }
+
+    //     Some(ElGamalPubkey(
+    //         CompressedRistretto::from_slice(bytes).decompress()?,
+    //     ))
+    // }
+}
+
 impl fmt::Display for ElGamalPubkey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", base64::encode(self.to_bytes()))
@@ -321,6 +344,7 @@ impl fmt::Display for ElGamalPubkey {
 ///
 /// Instances of ElGamal secret key are zeroized on drop.
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
+#[wasm_bindgen(getter_with_clone)]
 #[zeroize(drop)]
 pub struct ElGamalSecretKey(Scalar);
 impl ElGamalSecretKey {
@@ -348,13 +372,6 @@ impl ElGamalSecretKey {
         Ok(ElGamalSecretKey(Scalar::hash_from_bytes::<Sha3_512>(
             signature.as_ref(),
         )))
-    }
-
-    /// Randomly samples an ElGamal secret key.
-    ///
-    /// This function is randomized. It internally samples a scalar element using `OsRng`.
-    pub fn new_rand() -> Self {
-        ElGamalSecretKey(Scalar::random(&mut OsRng))
     }
 
     pub fn get_scalar(&self) -> &Scalar {
@@ -387,6 +404,16 @@ impl ElGamalSecretKey {
             Ok(bytes) => Scalar::from_canonical_bytes(bytes).map(ElGamalSecretKey),
             _ => None,
         }
+    }
+}
+
+#[wasm_bindgen]
+impl ElGamalSecretKey {
+    /// Randomly samples an ElGamal secret key.
+    ///
+    /// This function is randomized. It internally samples a scalar element using `OsRng`.
+    pub fn new_rand() -> Self {
+        ElGamalSecretKey(Scalar::random(&mut OsRng))
     }
 }
 
