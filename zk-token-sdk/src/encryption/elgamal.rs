@@ -53,22 +53,10 @@ use {
 };
 
 /// Algorithm handle for the twisted ElGamal encryption scheme
+
+#[wasm_bindgen]
 pub struct ElGamal;
 impl ElGamal {
-    /// Generates an ElGamal keypair.
-    ///
-    /// This function is randomized. It internally samples a scalar element using `OsRng`.
-    #[cfg(not(target_os = "solana"))]
-    #[allow(non_snake_case)]
-    fn keygen() -> ElGamalKeypair {
-        // secret scalar should be non-zero except with negligible probability
-        let mut s = Scalar::random(&mut OsRng);
-        let keypair = Self::keygen_with_scalar(&s);
-
-        s.zeroize();
-        keypair
-    }
-
     /// Generates an ElGamal keypair from a scalar input that determines the ElGamal private key.
     ///
     /// This function panics if the input scalar is zero, which is not a valid key.
@@ -143,10 +131,55 @@ impl ElGamal {
     }
 }
 
+#[wasm_bindgen]
+impl ElGamal {
+    /// Generates an ElGamal keypair.
+    ///
+    /// This function is randomized. It internally samples a scalar element using `OsRng`.
+    #[cfg(not(target_os = "solana"))]
+    pub fn keygen() -> ElGamalKeypair {
+        // secret scalar should be non-zero except with negligible probability
+        let mut s = Scalar::random(&mut OsRng);
+        let keypair = Self::keygen_with_scalar(&s);
+
+        s.zeroize();
+        keypair
+    }
+
+    /// On input an ElGamal public key and an amount to be encrypted, the function returns a
+    /// corresponding ElGamal ciphertext.
+    ///
+    /// This function is randomized. It internally samples a scalar element using `OsRng`.
+    #[cfg(not(target_os = "solana"))]
+    // TODO: just using u32 for now. Do we need to support u256 ie Scalar?
+    pub fn encrypt_amount(public_key: &ElGamalPubkey, amount: u32) -> ElGamalCiphertext {
+        let (commitment, opening) = Pedersen::new(amount);
+        let handle = public_key.decrypt_handle(&opening);
+
+        ElGamalCiphertext { commitment, handle }
+    }
+
+    /// On input a secret key and a ciphertext, the function returns the decrypted amount
+    /// interpretted as a positive 32-bit number (but still of type `u64`).
+    ///
+    /// If the originally encrypted amount is not a positive 32-bit number, then the function
+    /// returns `None`.
+    /// Note: copy of decrypt_u32
+    #[cfg(not(target_os = "solana"))]
+    pub fn decrypt_amount(
+        secret: &ElGamalSecretKey,
+        ciphertext: &ElGamalCiphertext,
+    ) -> Option<u64> {
+        let discrete_log_instance = Self::decrypt(secret, ciphertext);
+        discrete_log_instance.decode_u32()
+    }
+}
+
 /// A (twisted) ElGamal encryption keypair.
 ///
 /// The instances of the secret key are zeroized on drop.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Zeroize)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct ElGamalKeypair {
     /// The public half of this keypair.
     pub public: ElGamalPubkey,
@@ -440,6 +473,7 @@ impl ConstantTimeEq for ElGamalSecretKey {
 /// Ciphertext for the ElGamal encryption scheme.
 #[allow(non_snake_case)]
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[wasm_bindgen]
 pub struct ElGamalCiphertext {
     pub commitment: PedersenCommitment,
     pub handle: DecryptHandle,
@@ -573,6 +607,7 @@ define_mul_variants!(
 
 /// Decryption handle for Pedersen commitment.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[wasm_bindgen]
 pub struct DecryptHandle(RistrettoPoint);
 impl DecryptHandle {
     pub fn new(public: &ElGamalPubkey, opening: &PedersenOpening) -> Self {
