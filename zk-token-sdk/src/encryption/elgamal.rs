@@ -322,15 +322,17 @@ impl ElGamalPubkey {
         Uint8Array::from(self.0.compress().to_bytes().as_slice())
     }
 
-    // pub fn from_uint8_array() from_bytes(bytes: &[u8]) -> Option<ElGamalPubkey> {
-    //     if bytes.len() != 32 {
-    //         return None;
-    //     }
+    pub fn from_uint8_array(from_array: Uint8Array) -> Option<ElGamalPubkey> {
+        let bytes = from_array.to_vec();
 
-    //     Some(ElGamalPubkey(
-    //         CompressedRistretto::from_slice(bytes).decompress()?,
-    //     ))
-    // }
+        if bytes.len() != 32 {
+            return None;
+        }
+
+        Some(ElGamalPubkey(
+            CompressedRistretto::from_slice(bytes.as_slice()).decompress()?,
+        ))
+    }
 }
 
 impl fmt::Display for ElGamalPubkey {
