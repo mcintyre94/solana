@@ -7326,6 +7326,7 @@ dependencies = [
  "curve25519-dalek",
  "getrandom 0.1.16",
  "itertools",
+ "js-sys",
  "lazy_static",
  "merlin",
  "num-derive",
@@ -7338,6 +7339,7 @@ dependencies = [
  "solana-sdk 1.16.0",
  "subtle",
  "thiserror",
+ "wasm-bindgen",
  "zeroize",
 ]
 

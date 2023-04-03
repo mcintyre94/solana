@@ -31,6 +31,8 @@ sha3 = "0.9"
 solana-sdk = { workspace = true }
 subtle = { workspace = true }
 thiserror = { workspace = true }
+js-sys="*"
+wasm-bindgen = "*"
 zeroize = { workspace = true, features = ["zeroize_derive"] }
 
 [lib]
