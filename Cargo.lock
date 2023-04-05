@@ -7323,6 +7323,7 @@ dependencies = [
  "bincode",
  "bytemuck",
  "byteorder",
+ "console_error_panic_hook",
  "curve25519-dalek",
  "getrandom 0.1.16",
  "itertools",
@@ -7340,6 +7341,7 @@ dependencies = [
  "subtle",
  "thiserror",
  "wasm-bindgen",
+ "web-sys",
  "zeroize",
 ]
 

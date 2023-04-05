@@ -19,6 +19,7 @@ aes-gcm-siv = { workspace = true }
 arrayref = { workspace = true }
 bincode = { workspace = true }
 byteorder = { workspace = true }
+console_error_panic_hook = "*"
 curve25519-dalek = { workspace = true, features = ["serde"] }
 getrandom = { workspace = true, features = ["dummy"] }
 itertools = { workspace = true }
@@ -32,6 +33,7 @@ solana-sdk = { workspace = true }
 subtle = { workspace = true }
 thiserror = { workspace = true }
 js-sys="*"
+web-sys = "*"
 wasm-bindgen = "*"
 zeroize = { workspace = true, features = ["zeroize_derive"] }
 

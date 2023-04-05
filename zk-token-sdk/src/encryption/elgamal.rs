@@ -13,9 +13,6 @@
 //! As the messages are encrypted as scalar elements (a.k.a. in the "exponent"), one must solve the
 //! discrete log to recover the originally encrypted value.
 
-use js_sys::Uint8Array;
-use wasm_bindgen::{convert::IntoWasmAbi, describe::WasmDescribe};
-
 use {
     crate::encryption::{
         discrete_log::DiscreteLog,
@@ -27,6 +24,7 @@ use {
         scalar::Scalar,
         traits::Identity,
     },
+    js_sys::Uint8Array,
     serde::{Deserialize, Serialize},
     solana_sdk::{
         instruction::Instruction,
@@ -53,22 +51,9 @@ use {
 };
 
 /// Algorithm handle for the twisted ElGamal encryption scheme
+#[wasm_bindgen]
 pub struct ElGamal;
 impl ElGamal {
-    /// Generates an ElGamal keypair.
-    ///
-    /// This function is randomized. It internally samples a scalar element using `OsRng`.
-    #[cfg(not(target_os = "solana"))]
-    #[allow(non_snake_case)]
-    fn keygen() -> ElGamalKeypair {
-        // secret scalar should be non-zero except with negligible probability
-        let mut s = Scalar::random(&mut OsRng);
-        let keypair = Self::keygen_with_scalar(&s);
-
-        s.zeroize();
-        keypair
-    }
-
     /// Generates an ElGamal keypair from a scalar input that determines the ElGamal private key.
     ///
     /// This function panics if the input scalar is zero, which is not a valid key.
@@ -143,12 +128,43 @@ impl ElGamal {
     }
 }
 
+#[wasm_bindgen]
+impl ElGamal {
+    /// Generates an ElGamal keypair.
+    ///
+    /// This function is randomized. It internally samples a scalar element using `OsRng`.
+    #[cfg(not(target_os = "solana"))]
+    #[allow(non_snake_case)]
+    pub fn keygen() -> ElGamalKeypair {
+        // secret scalar should be non-zero except with negligible probability
+        let mut s = Scalar::random(&mut OsRng);
+        let keypair = Self::keygen_with_scalar(&s);
+
+        s.zeroize();
+        keypair
+    }
+
+    /// On input an ElGamal public key and an amount to be encrypted, the function returns a
+    /// corresponding ElGamal ciphertext.
+    ///
+    /// This function is randomized. It internally samples a scalar element using `OsRng`.
+    #[cfg(not(target_os = "solana"))]
+    pub fn encrypt_amount(public_key: &ElGamalPubkey, amount: u64) -> ElGamalCiphertext {
+        let (commitment, opening) = Pedersen::new(amount);
+        let handle = public_key.decrypt_handle(&opening);
+
+        ElGamalCiphertext { commitment, handle }
+    }
+}
+
 /// A (twisted) ElGamal encryption keypair.
 ///
 /// The instances of the secret key are zeroized on drop.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize, Zeroize)]
+#[wasm_bindgen(getter_with_clone)]
 pub struct ElGamalKeypair {
     /// The public half of this keypair.
+    #[wasm_bindgen(js_name = "publicKey")]
     pub public: ElGamalPubkey,
     /// The secret half of this keypair.
     pub secret: ElGamalSecretKey,
@@ -416,6 +432,20 @@ impl ElGamalSecretKey {
     pub fn new_rand() -> Self {
         ElGamalSecretKey(Scalar::random(&mut OsRng))
     }
+
+    pub fn to_uint8_array(&self) -> Uint8Array {
+        Uint8Array::from(self.to_bytes().as_slice())
+    }
+
+    pub fn from_uint8_array(from_array: Uint8Array) -> Option<ElGamalSecretKey> {
+        let bytes = from_array.to_vec();
+
+        if bytes.len() != 32 {
+            return None;
+        }
+
+        ElGamalSecretKey::from_bytes(&bytes)
+    }
 }
 
 impl From<Scalar> for ElGamalSecretKey {
@@ -439,6 +469,7 @@ impl ConstantTimeEq for ElGamalSecretKey {
 /// Ciphertext for the ElGamal encryption scheme.
 #[allow(non_snake_case)]
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[wasm_bindgen]
 pub struct ElGamalCiphertext {
     pub commitment: PedersenCommitment,
     pub handle: DecryptHandle,
@@ -493,6 +524,33 @@ impl ElGamalCiphertext {
     /// returns `None`.
     pub fn decrypt_u32(&self, secret: &ElGamalSecretKey) -> Option<u64> {
         ElGamal::decrypt_u32(secret, self)
+    }
+}
+
+#[wasm_bindgen]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
+#[wasm_bindgen]
+impl ElGamalCiphertext {
+    /// Decrypts the ciphertext using an ElGamal secret key.
+    ///
+    /// The output of this function is of type `DiscreteLog`. To recover, the originally encrypted
+    /// amount, use `DiscreteLog::decode`.
+    pub fn decrypt_amount(&self, secret: &ElGamalSecretKey) -> u64 {
+        init_panic_hook();
+        let discrete_log = ElGamal::decrypt(secret, self);
+        DiscreteLog::decode_u32_sync(discrete_log).unwrap()
+        // 123
+    }
+
+    pub fn add_amount_js(&self, amount: u64) -> Self {
+        let commitment_to_add = PedersenCommitment(Scalar::from(amount) * &(*G));
+        ElGamalCiphertext {
+            commitment: &self.commitment + &commitment_to_add,
+            handle: self.handle,
+        }
     }
 }
 
@@ -572,6 +630,7 @@ define_mul_variants!(
 
 /// Decryption handle for Pedersen commitment.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[wasm_bindgen]
 pub struct DecryptHandle(RistrettoPoint);
 impl DecryptHandle {
     pub fn new(public: &ElGamalPubkey, opening: &PedersenOpening) -> Self {

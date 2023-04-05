@@ -27,6 +27,8 @@ use {
     itertools::Itertools,
     serde::{Deserialize, Serialize},
     std::{collections::HashMap, thread},
+    wasm_bindgen::prelude::*,
+    web_sys::console,
 };
 
 const TWO16: u64 = 65536; // 2^16
@@ -137,6 +139,8 @@ impl DiscreteLog {
                     (-(&self.step_point), self.num_threads as u64),
                 );
 
+                console::log_1(&"after ristretto_iterator".into());
+
                 let handle = thread::spawn(move || {
                     Self::decode_range(
                         ristretto_iterator,
@@ -144,6 +148,8 @@ impl DiscreteLog {
                         self.compression_batch_size,
                     )
                 });
+
+                console::log_1(&"after handle".into());
 
                 starting_point -= G;
                 handle
@@ -153,6 +159,36 @@ impl DiscreteLog {
         let mut solution = None;
         for handle in handles {
             let discrete_log = handle.join().unwrap();
+            if discrete_log.is_some() {
+                solution = discrete_log;
+            }
+        }
+        solution
+    }
+
+    pub fn decode_u32_sync(self) -> Option<u64> {
+        let mut starting_point = self.target;
+        let handles = (0..self.num_threads)
+            .map(|i| {
+                let ristretto_iterator = RistrettoIterator::new(
+                    (starting_point, i as u64),
+                    (-(&self.step_point), self.num_threads as u64),
+                );
+
+                let handle = Self::decode_range(
+                    ristretto_iterator,
+                    self.range_bound,
+                    self.compression_batch_size,
+                );
+
+                starting_point -= G;
+                handle
+            })
+            .collect::<Vec<_>>();
+
+        let mut solution = None;
+        for handle in handles {
+            let discrete_log = handle;
             if discrete_log.is_some() {
                 solution = discrete_log;
             }

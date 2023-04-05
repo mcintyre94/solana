@@ -14,6 +14,7 @@ use {
     sha3::Sha3_512,
     std::convert::TryInto,
     subtle::{Choice, ConstantTimeEq},
+    wasm_bindgen::prelude::*,
     zeroize::Zeroize,
 };
 
@@ -163,6 +164,7 @@ define_mul_variants!(
 
 /// Pedersen commitment type.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[wasm_bindgen]
 pub struct PedersenCommitment(pub(crate) RistrettoPoint);
 impl PedersenCommitment {
     pub fn get_point(&self) -> &RistrettoPoint {
